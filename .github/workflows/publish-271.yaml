@@ -78,11 +78,11 @@ jobs:
           path: ./wheelhouse/*.whl
 
   publish:
-    name: Publish 271 to PyPI
+    name: Publish to GitHub Releases
     needs: build_wheels
     runs-on: ubuntu-latest
     permissions:
-      id-token: write
+      contents: write
 
     steps:
       - name: Download all wheels
@@ -92,9 +92,11 @@ jobs:
           path: dist
           merge-multiple: true
 
-      - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@v1.12.4
+      - name: Create Release and Upload Wheels
+        uses: softprops/action-gh-release@v2
         with:
-          user: __token__
-          password: ${{ secrets.PYPI_API_TOKEN }}
-          skip-existing: true
+          tag_name: torch271-${{ github.sha }}
+          name: "Wheels for torch 2.7.1 - ${{ github.sha }}"
+          files: dist/*.whl
+          draft: false
+          prerelease: false

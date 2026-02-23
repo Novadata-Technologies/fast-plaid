@@ -78,23 +78,25 @@ jobs:
           path: ./wheelhouse/*.whl
 
   publish:
-    name: Publish 290 to PyPI
+    name: Publish to GitHub Releases
     needs: build_wheels
     runs-on: ubuntu-latest
     permissions:
-      id-token: write
+      contents: write
 
-    steps:
-      - name: Download all wheels
-        uses: actions/download-artifact@v4
-        with:
-          pattern: wheels-*-py*
-          path: dist
-          merge-multiple: true
+  steps:
+    - name: Download all wheels
+      uses: actions/download-artifact@v4
+      with:
+        pattern: wheels-*-py*
+        path: dist
+        merge-multiple: true
 
-      - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@v1.12.4
-        with:
-          user: __token__
-          password: ${{ secrets.PYPI_API_TOKEN }}
-          skip-existing: true
+    - name: Create Release and Upload Wheels
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: torch290-${{ github.sha }}
+        name: "Wheels for torch 2.9.0 - ${{ github.sha }}"
+        files: dist/*.whl
+        draft: false
+        prerelease: false
