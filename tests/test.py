@@ -1268,6 +1268,49 @@ class TestInvertedIndex:
             == []
         )
 
+    def test_update_rebuild_preserves_inverted_index(self, test_index_path):
+        """update() rebuild-from-scratch must not destroy the inverted index."""
+        index = search.FastPlaid(index=test_index_path, device="cpu")
+
+        try:
+            embedding_dim = 128
+            initial_embeddings = [torch.randn(10, embedding_dim) for _ in range(3)]
+            initial_metadata = [
+                {"name": "A", "foreign_ids": [1, 2]},
+                {"name": "B", "foreign_ids": [2, 3]},
+                {"name": "C", "foreign_ids": [3, 4]},
+            ]
+            index.create(
+                documents_embeddings=initial_embeddings,
+                metadata=initial_metadata,
+            )
+
+            # Verify inverted index works before update
+            assert filtering.where_any(
+                index=test_index_path, field="foreign_ids", values=[2]
+            ) == [0, 1]
+
+            # Update with few enough docs to trigger rebuild-from-scratch
+            new_embeddings = [torch.randn(10, embedding_dim) for _ in range(2)]
+            new_metadata = [
+                {"name": "D", "foreign_ids": [4, 5]},
+                {"name": "E", "foreign_ids": [1, 5]},
+            ]
+            index.update(documents_embeddings=new_embeddings, metadata=new_metadata)
+
+            # Inverted index must still work after rebuild-from-scratch
+            assert filtering.where_any(
+                index=test_index_path, field="foreign_ids", values=[2]
+            ) == [0, 1]
+            assert filtering.where_any(
+                index=test_index_path, field="foreign_ids", values=[5]
+            ) == [3, 4]
+            assert filtering.where_all(
+                index=test_index_path, field="foreign_ids", values=[1, 2]
+            ) == [0]
+        finally:
+            index.close()
+
     def test_combine_where_and_where_any(self, test_index_path):
         """SQL where() and inverted where_any() can be combined via set ops."""
         metadata = [

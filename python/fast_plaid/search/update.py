@@ -15,6 +15,11 @@ from fast_plaid import fast_plaid_rust
 from usearch.index import Index
 
 from ..filtering import update as update_metadata_db
+from ..filtering.filtering import (
+    _get_list_field_names,
+    _rebuild_inverted_index_from_db,
+    _save_inverted_index,
+)
 from .load import (
     _construct_index_from_tensors,
     _load_index_tensors_cpu,
@@ -322,6 +327,9 @@ def process_update(
         ]
         documents_embeddings = existing_embeddings + documents_embeddings
 
+        # Save list field names before create_fn deletes metadata_inverted.json
+        list_fields = _get_list_field_names(index_path)
+
         create_fn(
             documents_embeddings=documents_embeddings,
             kmeans_niters=kmeans_niters,
@@ -333,6 +341,12 @@ def process_update(
             metadata=None,
             start_from_scratch=start_from_scratch,
         )
+
+        # _prepare_index_directory inside create_fn deletes all .json files,
+        # including metadata_inverted.json. Rebuild it from the SQLite DB.
+        if list_fields:
+            inverted = _rebuild_inverted_index_from_db(index_path, list_fields)
+            _save_inverted_index(index_path, inverted)
 
         if len(documents_embeddings) > start_from_scratch and os.path.exists(
             os.path.join(index_path, "embeddings.npy")
